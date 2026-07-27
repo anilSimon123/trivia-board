@@ -1,26 +1,91 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f1e7;
+  --foreground: #1a1a1a;
+
+  /* Post-it hues (paper + shadow tint) */
+  --postit-yellow: #fef08a;
+  --postit-yellow-edge: #fde047;
+  --postit-pink: #fbcfe8;
+  --postit-pink-edge: #f9a8d4;
+  --postit-blue: #bfdbfe;
+  --postit-blue-edge: #93c5fd;
+  --postit-green: #bbf7d0;
+  --postit-green-edge: #86efac;
+  --postit-orange: #fed7aa;
+  --postit-orange-edge: #fdba74;
+  --postit-purple: #ddd6fe;
+  --postit-purple-edge: #c4b5fd;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-hand: var(--font-caveat);
+
+  --color-postit-yellow: var(--postit-yellow);
+  --color-postit-pink: var(--postit-pink);
+  --color-postit-blue: var(--postit-blue);
+  --color-postit-green: var(--postit-green);
+  --color-postit-orange: var(--postit-orange);
+  --color-postit-purple: var(--postit-purple);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Cork / whiteboard backdrop for the game page */
+.board-surface {
+  background-color: #efe6d2;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(140, 100, 60, 0.08) 0, transparent 40%),
+    radial-gradient(circle at 80% 30%, rgba(140, 100, 60, 0.08) 0, transparent 40%),
+    radial-gradient(circle at 40% 80%, rgba(140, 100, 60, 0.1) 0, transparent 40%),
+    radial-gradient(rgba(140, 100, 60, 0.12) 1px, transparent 1.2px),
+    radial-gradient(rgba(120, 80, 40, 0.08) 1px, transparent 1.2px);
+  background-size: auto, auto, auto, 6px 6px, 11px 11px;
+  background-position: 0 0, 0 0, 0 0, 0 0, 3px 3px;
+}
+
+/* Slight paper grain on a post-it */
+.postit-paper {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.25), rgba(0, 0, 0, 0.06)),
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.02) 0 1px,
+      transparent 1px 3px
+    );
+}
+
+/* Curled-corner shadow used on post-its */
+.postit-shadow {
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.15),
+    0 12px 20px -6px rgba(0, 0, 0, 0.18);
+}
+
+.postit-shadow-lg {
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.12),
+    0 16px 32px -8px rgba(0, 0, 0, 0.25),
+    0 40px 60px -20px rgba(0, 0, 0, 0.3);
+}
+
+/* Handwritten heading used for post-its and the board title */
+.font-hand {
+  font-family: var(--font-caveat), "Comic Sans MS", cursive;
+  letter-spacing: 0.01em;
 }
