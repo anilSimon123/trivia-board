@@ -27,9 +27,15 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const questionMap = useMemo(() => {
-    const map = new Map<string, Question>();
-    for (const q of board.questions) map.set(`${q.difficultyId}:${q.categoryId}`, q);
+  // Group questions per (difficulty, category). Preserves array order.
+  const cellQuestions = useMemo(() => {
+    const map = new Map<string, Question[]>();
+    for (const q of board.questions) {
+      const key = `${q.difficultyId}:${q.categoryId}`;
+      const arr = map.get(key);
+      if (arr) arr.push(q);
+      else map.set(key, [q]);
+    }
     return map;
   }, [board.questions]);
 
@@ -86,40 +92,34 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
     }));
   };
 
-  const setQuestion = (
-    difficultyId: string,
-    categoryId: string,
+  const addQuestion = (difficultyId: string, categoryId: string) => {
+    const created: Question = {
+      id: newId(),
+      difficultyId,
+      categoryId,
+      text: "",
+    };
+    setBoard((b) => ({ ...b, questions: [...b.questions, created] }));
+  };
+
+  const updateQuestion = (
+    id: string,
     patch: Partial<Pick<Question, "text" | "answer">>,
   ) => {
-    setBoard((b) => {
-      const key = `${difficultyId}:${categoryId}`;
-      const existing = b.questions.find(
-        (q) => `${q.difficultyId}:${q.categoryId}` === key,
-      );
-      if (existing) {
-        return {
-          ...b,
-          questions: b.questions.map((q) =>
-            q.id === existing.id ? { ...q, ...patch } : q,
-          ),
-        };
-      }
-      const created: Question = {
-        id: newId(),
-        difficultyId,
-        categoryId,
-        text: patch.text ?? "",
-        answer: patch.answer,
-      };
-      return { ...b, questions: [...b.questions, created] };
-    });
+    setBoard((b) => ({
+      ...b,
+      questions: b.questions.map((q) => (q.id === id ? { ...q, ...patch } : q)),
+    }));
+  };
+
+  const removeQuestion = (id: string) => {
+    setBoard((b) => ({ ...b, questions: b.questions.filter((q) => q.id !== id) }));
   };
 
   const save = async () => {
     setSaving(true);
     setError(null);
     try {
-      // Prune blank questions before saving so they don't clutter the board.
       const cleaned: Board = {
         ...board,
         questions: board.questions.filter((q) => q.text.trim().length > 0),
@@ -143,8 +143,7 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
     }
   };
 
-  const totalCells = board.categories.length * board.difficulties.length;
-  const filledCells = board.questions.filter((q) => q.text.trim().length > 0).length;
+  const filledQuestions = board.questions.filter((q) => q.text.trim().length > 0).length;
 
   return (
     <div className="min-h-dvh w-full bg-zinc-50 text-zinc-900">
@@ -169,7 +168,7 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
               title={
                 storageMode === "supabase"
                   ? "Persisted to Supabase"
-                  : "Saved to a local file (.data/board.json). Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY to use Supabase."
+                  : "Saved to a local file (.data/board.json). Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY) to use Supabase."
               }
             >
               {storageMode === "supabase" ? "Supabase" : "Local file"}
@@ -177,7 +176,7 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden sm:inline text-sm text-zinc-500">
-              {filledCells}/{totalCells || 0} filled
+              {filledQuestions} question{filledQuestions === 1 ? "" : "s"}
             </span>
             {savedAt && !error && (
               <span className="text-xs text-emerald-600">Saved {savedAt}</span>
@@ -200,7 +199,6 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
       </header>
 
       <main className="mx-auto max-w-[1600px] px-4 sm:px-8 py-6 sm:py-10 space-y-8">
-        {/* Board meta */}
         <section className="rounded-xl border border-zinc-200 bg-white p-5 sm:p-6">
           <label className="block text-xs font-semibold uppercase tracking-widest text-zinc-500 mb-1">
             Board title
@@ -213,7 +211,6 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
           />
         </section>
 
-        {/* Structure controls */}
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Stepper
             label="Difficulty tiers (rows)"
@@ -235,7 +232,6 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
           />
         </section>
 
-        {/* Grid editor */}
         {board.categories.length === 0 || board.difficulties.length === 0 ? (
           <div className="rounded-xl border border-dashed border-zinc-300 bg-white p-10 text-center text-zinc-500">
             <Sparkles className="size-5 inline mr-1 text-amber-500" />
@@ -247,10 +243,9 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
             <div
               className="grid min-w-[720px]"
               style={{
-                gridTemplateColumns: `minmax(11rem, 14rem) repeat(${board.categories.length}, minmax(16rem, 1fr))`,
+                gridTemplateColumns: `minmax(11rem, 14rem) repeat(${board.categories.length}, minmax(18rem, 1fr))`,
               }}
             >
-              {/* Header row */}
               <div className="border-b border-r border-zinc-200 bg-zinc-50 p-3 text-xs font-semibold uppercase tracking-widest text-zinc-500">
                 Difficulty ↓ / Category →
               </div>
@@ -281,18 +276,17 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
                 </div>
               ))}
 
-              {/* Difficulty rows */}
               {board.difficulties.map((diff) => (
                 <DifficultyRow
                   key={diff.id}
                   diff={diff}
                   categories={board.categories}
-                  questionMap={questionMap}
+                  cellQuestions={cellQuestions}
                   onUpdateDiff={(patch) => updateDifficulty(diff.id, patch)}
                   onRemoveDiff={() => removeDifficulty(diff.id)}
-                  onSetQuestion={(categoryId, patch) =>
-                    setQuestion(diff.id, categoryId, patch)
-                  }
+                  onAddQuestion={(categoryId) => addQuestion(diff.id, categoryId)}
+                  onUpdateQuestion={updateQuestion}
+                  onRemoveQuestion={removeQuestion}
                 />
               ))}
             </div>
@@ -300,8 +294,9 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
         )}
 
         <p className="text-xs text-zinc-500">
-          Tip: leave a cell blank to skip that slot on the board. Questions are
-          pruned automatically on save.
+          Tip: each cell can hold multiple questions — they&apos;ll appear as a
+          stack of post-its on the board and reveal one at a time. Empty
+          questions are pruned automatically on save.
         </p>
       </main>
     </div>
@@ -351,20 +346,24 @@ function Stepper({
 function DifficultyRow({
   diff,
   categories,
-  questionMap,
+  cellQuestions,
   onUpdateDiff,
   onRemoveDiff,
-  onSetQuestion,
+  onAddQuestion,
+  onUpdateQuestion,
+  onRemoveQuestion,
 }: {
   diff: Difficulty;
   categories: Category[];
-  questionMap: Map<string, Question>;
+  cellQuestions: Map<string, Question[]>;
   onUpdateDiff: (patch: Partial<Difficulty>) => void;
   onRemoveDiff: () => void;
-  onSetQuestion: (
-    categoryId: string,
+  onAddQuestion: (categoryId: string) => void;
+  onUpdateQuestion: (
+    id: string,
     patch: Partial<Pick<Question, "text" | "answer">>,
   ) => void;
+  onRemoveQuestion: (id: string) => void;
 }) {
   return (
     <>
@@ -397,26 +396,85 @@ function DifficultyRow({
 
       {categories.map((cat) => {
         const key = `${diff.id}:${cat.id}`;
-        const q = questionMap.get(key);
+        const questions = cellQuestions.get(key) ?? [];
         return (
-          <div key={cat.id} className="border-b border-zinc-200 p-3 flex flex-col gap-2">
-            <textarea
-              value={q?.text ?? ""}
-              onChange={(e) => onSetQuestion(cat.id, { text: e.target.value })}
-              rows={3}
-              placeholder="Question..."
-              className="w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm leading-relaxed focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100"
-            />
-            <input
-              value={q?.answer ?? ""}
-              onChange={(e) => onSetQuestion(cat.id, { answer: e.target.value })}
-              placeholder="Host hint / answer (optional)"
-              className="w-full rounded-md border border-zinc-100 bg-zinc-50 px-3 py-1.5 text-xs text-zinc-600 focus:outline-none focus:border-zinc-300"
-            />
+          <div
+            key={cat.id}
+            className="border-b border-zinc-200 p-3 flex flex-col gap-3"
+          >
+            {questions.length === 0 && (
+              <div className="text-xs text-zinc-400 italic px-1">
+                No questions yet.
+              </div>
+            )}
+            {questions.map((q, idx) => (
+              <QuestionCard
+                key={q.id}
+                index={idx}
+                total={questions.length}
+                question={q}
+                onUpdate={(patch) => onUpdateQuestion(q.id, patch)}
+                onRemove={() => onRemoveQuestion(q.id)}
+              />
+            ))}
+            <button
+              onClick={() => onAddQuestion(cat.id)}
+              className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-100 hover:border-zinc-400 hover:text-zinc-900 transition"
+            >
+              <Plus className="size-3.5" />
+              {questions.length === 0 ? "Add question" : "Add another"}
+            </button>
           </div>
         );
       })}
     </>
+  );
+}
+
+function QuestionCard({
+  index,
+  total,
+  question,
+  onUpdate,
+  onRemove,
+}: {
+  index: number;
+  total: number;
+  question: Question;
+  onUpdate: (patch: Partial<Pick<Question, "text" | "answer">>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="rounded-md border border-zinc-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-zinc-100 bg-zinc-50/60 rounded-t-md">
+        <span className="text-[0.65rem] uppercase tracking-widest text-zinc-500 font-semibold">
+          Question {index + 1}
+          {total > 1 && <span className="text-zinc-400"> / {total}</span>}
+        </span>
+        <button
+          onClick={onRemove}
+          className="text-zinc-400 hover:text-red-600 transition"
+          aria-label="Remove question"
+        >
+          <Trash2 className="size-3.5" />
+        </button>
+      </div>
+      <div className="p-2.5 flex flex-col gap-2">
+        <textarea
+          value={question.text}
+          onChange={(e) => onUpdate({ text: e.target.value })}
+          rows={2}
+          placeholder="Question..."
+          className="w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm leading-relaxed focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100"
+        />
+        <input
+          value={question.answer ?? ""}
+          onChange={(e) => onUpdate({ answer: e.target.value })}
+          placeholder="Host hint / answer (optional)"
+          className="w-full rounded-md border border-zinc-100 bg-zinc-50 px-3 py-1.5 text-xs text-zinc-600 focus:outline-none focus:border-zinc-300"
+        />
+      </div>
+    </div>
   );
 }
 

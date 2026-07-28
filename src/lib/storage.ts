@@ -8,7 +8,11 @@ import type { Board } from "./types";
 import { emptyBoard } from "./types";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Accept both the new key name (SUPABASE_SECRET_KEY) and the legacy one
+// (SUPABASE_SERVICE_ROLE_KEY). Either works — supabase-js takes the string
+// as-is.
+const SUPABASE_SERVICE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY;
 const BOARD_ROW_ID = "current";
 
 const LOCAL_BOARD_FILE = path.join(process.cwd(), ".data", "board.json");

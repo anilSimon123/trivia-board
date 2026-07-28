@@ -69,12 +69,16 @@ free tier for real hosting.
    );
    ```
 
-3. Grab the following from **Project Settings → API**:
+3. Grab the following from **Project Settings → API** (or the "Connect →
+   API" panel):
    - `Project URL` → `SUPABASE_URL`
-   - `service_role` key (NOT the anon key) → `SUPABASE_SERVICE_ROLE_KEY`
+   - **secret key** (aka `service_role` in the old naming — the one that is
+     NOT the publishable/anon key) → `SUPABASE_SERVICE_ROLE_KEY`
+     (the code also accepts `SUPABASE_SECRET_KEY` if you prefer to match
+     Supabase's new naming exactly).
 
-   The service role key is used only from server-side API routes, never sent
-   to the browser. Do not expose it as `NEXT_PUBLIC_*`.
+   This key is used only from server-side API routes, never sent to the
+   browser. Do not expose it as `NEXT_PUBLIC_*`.
 
 4. Add both to `.env.local` and to your Vercel environment variables.
 
