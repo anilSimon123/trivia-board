@@ -268,6 +268,7 @@ export function GameBoard({ initialBoard }: GameBoardProps) {
         points={activeDifficulty?.points ?? 0}
         text={active?.text ?? ""}
         answer={active?.answer}
+        options={active?.options}
         onMarkAnswered={() => {
           if (active) {
             markAnswered(active.id);

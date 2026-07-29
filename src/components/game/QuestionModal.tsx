@@ -24,9 +24,12 @@ type QuestionModalProps = {
   points: number;
   text: string;
   answer?: string;
+  options?: string[];
   onMarkAnswered: () => void;
   onClose: () => void;
 };
+
+const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 
 export function QuestionModal({
   open,
@@ -37,9 +40,13 @@ export function QuestionModal({
   points,
   text,
   answer,
+  options,
   onMarkAnswered,
   onClose,
 }: QuestionModalProps) {
+  const visibleOptions = (options ?? [])
+    .map((o) => o.trim())
+    .filter((o) => o.length > 0);
   return (
     <AnimatePresence>
       {open && questionId && (
@@ -91,6 +98,38 @@ export function QuestionModal({
               <p className="font-hand font-semibold text-black/85 leading-tight text-[clamp(2rem,5vw,4rem)] max-w-2xl">
                 {text}
               </p>
+
+              {visibleOptions.length > 0 && (
+                <motion.ul
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                    transition: { delay: 0.35, duration: 0.35 },
+                  }}
+                  className={cn(
+                    "mt-4 sm:mt-6 w-full max-w-2xl mx-auto",
+                    "grid gap-2 sm:gap-3",
+                    visibleOptions.length > 2
+                      ? "grid-cols-1 sm:grid-cols-2 text-left"
+                      : "grid-cols-1 text-left",
+                  )}
+                >
+                  {visibleOptions.map((opt, i) => (
+                    <li
+                      key={i}
+                      className="flex items-start gap-3 rounded-md bg-black/5 px-4 py-3"
+                    >
+                      <span className="font-hand font-bold text-black/70 text-2xl sm:text-3xl leading-none shrink-0">
+                        {OPTION_LETTERS[i] ?? i + 1}.
+                      </span>
+                      <span className="font-hand text-black/80 text-xl sm:text-2xl leading-tight">
+                        {opt}
+                      </span>
+                    </li>
+                  ))}
+                </motion.ul>
+              )}
 
               {answer && (
                 <details className="mt-2 group">

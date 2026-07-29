@@ -104,11 +104,25 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
 
   const updateQuestion = (
     id: string,
-    patch: Partial<Pick<Question, "text" | "answer">>,
+    patch: Partial<Pick<Question, "text" | "answer" | "options">>,
   ) => {
     setBoard((b) => ({
       ...b,
       questions: b.questions.map((q) => (q.id === id ? { ...q, ...patch } : q)),
+    }));
+  };
+
+  const updateOption = (id: string, index: number, value: string) => {
+    setBoard((b) => ({
+      ...b,
+      questions: b.questions.map((q) => {
+        if (q.id !== id) return q;
+        const next = [...(q.options ?? ["", "", "", ""])];
+        // Pad to at least (index + 1) so we can write to the target slot.
+        while (next.length <= index) next.push("");
+        next[index] = value;
+        return { ...q, options: next };
+      }),
     }));
   };
 
@@ -122,7 +136,17 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
     try {
       const cleaned: Board = {
         ...board,
-        questions: board.questions.filter((q) => q.text.trim().length > 0),
+        questions: board.questions
+          .filter((q) => q.text.trim().length > 0)
+          .map((q) => {
+            const opts = (q.options ?? [])
+              .map((o) => o.trim())
+              .filter((o) => o.length > 0);
+            const next: Question = { ...q };
+            if (opts.length > 0) next.options = opts;
+            else delete next.options;
+            return next;
+          }),
       };
       const res = await fetch("/api/board", {
         method: "POST",
@@ -286,6 +310,7 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
                   onRemoveDiff={() => removeDifficulty(diff.id)}
                   onAddQuestion={(categoryId) => addQuestion(diff.id, categoryId)}
                   onUpdateQuestion={updateQuestion}
+                  onUpdateOption={updateOption}
                   onRemoveQuestion={removeQuestion}
                 />
               ))}
@@ -351,6 +376,7 @@ function DifficultyRow({
   onRemoveDiff,
   onAddQuestion,
   onUpdateQuestion,
+  onUpdateOption,
   onRemoveQuestion,
 }: {
   diff: Difficulty;
@@ -361,8 +387,9 @@ function DifficultyRow({
   onAddQuestion: (categoryId: string) => void;
   onUpdateQuestion: (
     id: string,
-    patch: Partial<Pick<Question, "text" | "answer">>,
+    patch: Partial<Pick<Question, "text" | "answer" | "options">>,
   ) => void;
+  onUpdateOption: (id: string, index: number, value: string) => void;
   onRemoveQuestion: (id: string) => void;
 }) {
   return (
@@ -414,6 +441,9 @@ function DifficultyRow({
                 total={questions.length}
                 question={q}
                 onUpdate={(patch) => onUpdateQuestion(q.id, patch)}
+                onUpdateOption={(optIdx, value) =>
+                  onUpdateOption(q.id, optIdx, value)
+                }
                 onRemove={() => onRemoveQuestion(q.id)}
               />
             ))}
@@ -431,19 +461,29 @@ function DifficultyRow({
   );
 }
 
+const OPTION_LETTERS = ["A", "B", "C", "D"] as const;
+
 function QuestionCard({
   index,
   total,
   question,
   onUpdate,
+  onUpdateOption,
   onRemove,
 }: {
   index: number;
   total: number;
   question: Question;
-  onUpdate: (patch: Partial<Pick<Question, "text" | "answer">>) => void;
+  onUpdate: (patch: Partial<Pick<Question, "text" | "answer" | "options">>) => void;
+  onUpdateOption: (index: number, value: string) => void;
   onRemove: () => void;
 }) {
+  // Always render four slots in the editor; blanks are pruned on save.
+  const optionSlots = Array.from(
+    { length: 4 },
+    (_, i) => question.options?.[i] ?? "",
+  );
+
   return (
     <div className="rounded-md border border-zinc-200 bg-white shadow-sm">
       <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-zinc-100 bg-zinc-50/60 rounded-t-md">
@@ -467,6 +507,23 @@ function QuestionCard({
           placeholder="Question..."
           className="w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm leading-relaxed focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100"
         />
+
+        <div className="grid grid-cols-1 gap-1.5">
+          {optionSlots.map((value, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="w-5 text-xs font-bold text-zinc-500 text-center">
+                {OPTION_LETTERS[i]}
+              </span>
+              <input
+                value={value}
+                onChange={(e) => onUpdateOption(i, e.target.value)}
+                placeholder={`Option ${OPTION_LETTERS[i]} (optional)`}
+                className="flex-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-800 focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100"
+              />
+            </div>
+          ))}
+        </div>
+
         <input
           value={question.answer ?? ""}
           onChange={(e) => onUpdate({ answer: e.target.value })}

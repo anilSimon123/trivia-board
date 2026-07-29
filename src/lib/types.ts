@@ -18,6 +18,12 @@ export type Question = {
   text: string;
   /** Optional canonical answer, shown to the host if they want a hint. */
   answer?: string;
+  /**
+   * Optional multiple-choice options. If present and non-empty, they render
+   * as A/B/C/D under the question. Zero-length or all-blank means "not a
+   * multiple choice question" and the block is hidden.
+   */
+  options?: string[];
 };
 
 export type Board = {
