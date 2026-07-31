@@ -15,17 +15,23 @@ import {
 import type { Board, Category, Difficulty, Question } from "@/lib/types";
 import { POSTIT_COLORS } from "@/lib/types";
 import { cn, newId } from "@/lib/utils";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 type AdminEditorProps = {
   initialBoard: Board;
   storageMode: "supabase" | "file";
 };
 
+type Pending =
+  | { kind: "category"; id: string; name: string; questionCount: number }
+  | { kind: "difficulty"; id: string; label: string; questionCount: number };
+
 export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
   const [board, setBoard] = useState<Board>(initialBoard);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
 
   // Group questions per (difficulty, category). Preserves array order.
   const cellQuestions = useMemo(() => {
@@ -59,6 +65,23 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
     }));
   };
 
+  const requestRemoveCategory = (cat: Category) => {
+    const questionCount = board.questions.filter(
+      (q) => q.categoryId === cat.id,
+    ).length;
+    // No content in the column → skip the confirm and just remove.
+    if (questionCount === 0) {
+      removeCategory(cat.id);
+      return;
+    }
+    setPending({
+      kind: "category",
+      id: cat.id,
+      name: cat.name || "this category",
+      questionCount,
+    });
+  };
+
   const updateCategory = (id: string, patch: Partial<Category>) => {
     setBoard((b) => ({
       ...b,
@@ -81,6 +104,29 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
       difficulties: b.difficulties.filter((d) => d.id !== id),
       questions: b.questions.filter((q) => q.difficultyId !== id),
     }));
+  };
+
+  const requestRemoveDifficulty = (diff: Difficulty) => {
+    const questionCount = board.questions.filter(
+      (q) => q.difficultyId === diff.id,
+    ).length;
+    if (questionCount === 0) {
+      removeDifficulty(diff.id);
+      return;
+    }
+    setPending({
+      kind: "difficulty",
+      id: diff.id,
+      label: diff.label || "this tier",
+      questionCount,
+    });
+  };
+
+  const confirmPending = () => {
+    if (!pending) return;
+    if (pending.kind === "category") removeCategory(pending.id);
+    else removeDifficulty(pending.id);
+    setPending(null);
   };
 
   const updateDifficulty = (id: string, patch: Partial<Difficulty>) => {
@@ -241,7 +287,7 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
             value={board.difficulties.length}
             onDecrement={() => {
               const last = board.difficulties.at(-1);
-              if (last) removeDifficulty(last.id);
+              if (last) requestRemoveDifficulty(last);
             }}
             onIncrement={addDifficulty}
           />
@@ -250,7 +296,7 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
             value={board.categories.length}
             onDecrement={() => {
               const last = board.categories.at(-1);
-              if (last) removeCategory(last.id);
+              if (last) requestRemoveCategory(last);
             }}
             onIncrement={addCategory}
           />
@@ -278,6 +324,14 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
                   key={cat.id}
                   className="border-b border-zinc-200 bg-zinc-50 p-3 flex items-center gap-2"
                 >
+                  <button
+                    onClick={() => requestRemoveCategory(cat)}
+                    className="shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 transition"
+                    aria-label={`Remove category ${cat.name}`}
+                    title="Remove this category"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
                   <input
                     value={cat.name}
                     onChange={(e) =>
@@ -290,13 +344,6 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
                     color={cat.color}
                     onChange={(color) => updateCategory(cat.id, { color })}
                   />
-                  <button
-                    onClick={() => removeCategory(cat.id)}
-                    className="text-zinc-400 hover:text-red-600 transition"
-                    aria-label="Remove category"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
                 </div>
               ))}
 
@@ -307,7 +354,7 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
                   categories={board.categories}
                   cellQuestions={cellQuestions}
                   onUpdateDiff={(patch) => updateDifficulty(diff.id, patch)}
-                  onRemoveDiff={() => removeDifficulty(diff.id)}
+                  onRemoveDiff={() => requestRemoveDifficulty(diff)}
                   onAddQuestion={(categoryId) => addQuestion(diff.id, categoryId)}
                   onUpdateQuestion={updateQuestion}
                   onUpdateOption={updateOption}
@@ -324,6 +371,27 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
           questions are pruned automatically on save.
         </p>
       </main>
+
+      <ConfirmDialog
+        open={!!pending}
+        title={
+          pending?.kind === "category"
+            ? `Delete category "${pending.name}"?`
+            : pending?.kind === "difficulty"
+              ? `Delete tier "${pending.label}"?`
+              : ""
+        }
+        description={
+          pending
+            ? `This will also permanently remove ${pending.questionCount} question${
+                pending.questionCount === 1 ? "" : "s"
+              } inside it. This can't be undone once you save.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        onConfirm={confirmPending}
+        onCancel={() => setPending(null)}
+      />
     </div>
   );
 }
@@ -395,13 +463,23 @@ function DifficultyRow({
   return (
     <>
       <div className="border-b border-r border-zinc-200 bg-zinc-50/60 p-3 flex flex-col gap-2">
-        <input
-          value={diff.label}
-          onChange={(e) => onUpdateDiff({ label: e.target.value })}
-          className="font-semibold bg-transparent focus:outline-none border-b border-transparent hover:border-zinc-300 focus:border-zinc-400 py-1"
-          placeholder="Tier label (Easy / Medium / Hard)"
-        />
         <div className="flex items-center gap-2">
+          <button
+            onClick={onRemoveDiff}
+            className="shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 transition"
+            aria-label={`Remove difficulty ${diff.label}`}
+            title="Remove this tier"
+          >
+            <Trash2 className="size-4" />
+          </button>
+          <input
+            value={diff.label}
+            onChange={(e) => onUpdateDiff({ label: e.target.value })}
+            className="flex-1 font-semibold bg-transparent focus:outline-none border-b border-transparent hover:border-zinc-300 focus:border-zinc-400 py-1"
+            placeholder="Tier label (Easy / Medium / Hard)"
+          />
+        </div>
+        <div className="flex items-center gap-2 pl-8">
           <input
             type="number"
             value={diff.points}
@@ -411,13 +489,6 @@ function DifficultyRow({
             className="w-24 rounded border border-zinc-200 px-2 py-1 text-sm"
           />
           <span className="text-xs text-zinc-500">pts</span>
-          <button
-            onClick={onRemoveDiff}
-            className="ml-auto text-zinc-400 hover:text-red-600 transition"
-            aria-label="Remove difficulty"
-          >
-            <Trash2 className="size-4" />
-          </button>
         </div>
       </div>
 
