@@ -322,28 +322,32 @@ export function AdminEditor({ initialBoard, storageMode }: AdminEditorProps) {
               {board.categories.map((cat) => (
                 <div
                   key={cat.id}
-                  className="border-b border-zinc-200 bg-zinc-50 p-3 flex items-center gap-2"
+                  className="border-b border-zinc-200 bg-zinc-50 p-3 flex flex-col gap-2"
                 >
-                  <button
-                    onClick={() => requestRemoveCategory(cat)}
-                    className="shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 transition"
-                    aria-label={`Remove category ${cat.name}`}
-                    title="Remove this category"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                  <input
-                    value={cat.name}
-                    onChange={(e) =>
-                      updateCategory(cat.id, { name: e.target.value })
-                    }
-                    className="flex-1 font-semibold bg-transparent focus:outline-none border-b border-transparent hover:border-zinc-300 focus:border-zinc-400 py-1"
-                    placeholder="Category name"
-                  />
-                  <ColorPicker
-                    color={cat.color}
-                    onChange={(color) => updateCategory(cat.id, { color })}
-                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => requestRemoveCategory(cat)}
+                      className="shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 transition"
+                      aria-label={`Remove category ${cat.name}`}
+                      title="Remove this category"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                    <input
+                      value={cat.name}
+                      onChange={(e) =>
+                        updateCategory(cat.id, { name: e.target.value })
+                      }
+                      className="flex-1 font-semibold bg-transparent focus:outline-none border-b border-transparent hover:border-zinc-300 focus:border-zinc-400 py-1"
+                      placeholder="Category name"
+                    />
+                  </div>
+                  <div className="pl-9">
+                    <ColorPicker
+                      color={cat.color}
+                      onChange={(color) => updateCategory(cat.id, { color })}
+                    />
+                  </div>
                 </div>
               ))}
 
